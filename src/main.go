@@ -27,10 +27,10 @@ type Message struct {
 func main() {
 	// Create a simple file server
 	fs := http.FileServer(http.Dir("../public"))
-	http.Handle("/", fs)
+	http.Handle("/chat/", http.StripPrefix("/chat", fs))
 
 	// Configure websocket route
-	http.HandleFunc("/ws", handleConnections)
+	http.HandleFunc("/chat/ws", handleConnections)
 
 	// Start listening for incoming chat messages
 	go handleMessages()
