@@ -3,8 +3,10 @@ package main
 import (
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 var clients = make(map[*websocket.Conn]bool) // connected clients
@@ -25,19 +27,41 @@ type Message struct {
 }
 
 func main() {
+	mux := http.NewServeMux()
 	// Create a simple file server
 	fs := http.FileServer(http.Dir("../public"))
-	http.Handle("/chat/", http.StripPrefix("/chat", fs))
+	mux.Handle("/chat/", http.StripPrefix("/chat/", fs))
 
-	// Configure websocket route
-	http.HandleFunc("/chat/ws", handleConnections)
-
+	// WebSocket route for /chat/ws
+	mux.HandleFunc("/chat/ws", handleConnections)
 	// Start listening for incoming chat messages
 	go handleMessages()
 
+	server := &http.Server{
+		Addr:           ":8000",
+		Handler:        mux,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
 	// Start the server on localhost port 8000 and log any errors
+	cacheDir := "certs"
+	certManager := autocert.Manager{
+		Prompt:     autocert.AcceptTOS,
+		Email:      "monkeydioude@gmail.com",
+		HostPolicy: autocert.HostWhitelist("4thehoard.com"), //Your domain here
+		Cache:      autocert.DirCache(cacheDir),             //Folder for storing certificates
+	}
+	server.TLSConfig = certManager.TLSConfig()
+	server.Addr = ":https"
+
+	// serve = func() error {
+	// 	go http.ListenAndServe(":http", certManager.HTTPHandler(nil))
+
+	// 	return server.ListenAndServeTLS("", "")
+	// }
 	log.Println("http server started on :8000")
-	err := http.ListenAndServe(":8000", nil)
+	err := server.ListenAndServe()
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
